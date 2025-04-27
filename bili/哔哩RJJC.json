@@ -1,0 +1,45 @@
+{
+  "classes": [
+          {
+      "type_name": "影视仓",
+      "type_id": "影视仓使用教材"
+    },
+    {
+      "type_name": "网盘挂载",
+      "type_id": "网盘挂载"
+    },
+    {
+      "type_name": "alist+WebDav",
+      "type_id": "alist+WebDav"
+    },
+    {
+      "type_name": "TVBox修改",
+      "type_id": "TVBOX修改教程"
+    },
+    {
+      "type_name": "阿里换token",
+      "type_id": "阿里token"
+    },
+    {
+      "type_name": "在线接口",
+      "type_id": "tvbox在线教程"
+    },
+    {
+      "type_name": "本地包",
+      "type_id": "tvbox本地包教程"
+    },
+    {
+      "type_name": "白嫖网站",
+      "type_id": "白嫖网站"
+    },
+    {
+      "type_name": "xml",
+      "type_id": "xml教程"
+    },
+    {
+      "type_name": "影仓api",
+      "type_id": "影视仓教程"
+    }
+  ],
+  "cookie": "SESSDATA=7624af93%2C1696008331%2C862c8%2A42; bili_jct=141a474ef3ce8cf2fedf384e68f6625d; DedeUserID=3493271303096985; DedeUserID__ckMd5=212a836c164605b7"
+}

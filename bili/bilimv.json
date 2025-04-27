@@ -1,0 +1,65 @@
+{
+  "classes": [
+    {
+      "type_name": "古风MV",
+      "type_id": "古风MV"
+    },
+    {
+      "type_name": "抖音音乐",
+      "type_id": "抖音音乐MV"
+    },
+    {
+      "type_name": "快手音乐",
+      "type_id": "快手音乐MV"
+    },
+    {
+      "type_name": "酷狗音乐",
+      "type_id": "酷狗音乐MV"
+    },
+    {
+      "type_name": "酷我音乐",
+      "type_id": "酷我音乐MV"
+    },
+    {
+      "type_name": "QQ音乐",
+      "type_id": "QQ音乐MV"
+    },
+    {
+      "type_name": "无损音乐",
+      "type_id": "无损音乐"
+    },
+    {
+      "type_name": "助眠曲",
+      "type_id": "助眠曲MV"
+    },
+    {
+      "type_name": "热榜",
+      "type_id": "热门MV"
+    },
+    {
+      "type_name": "粤语",
+      "type_id": "粤语MV"
+    },
+    {
+      "type_name": "钢琴曲",
+      "type_id": "钢琴曲MV"
+    },
+    {
+      "type_name": "KTV热门",
+      "type_id": "KTV热门MV"
+    },
+    {
+      "type_name": "经典老歌",
+      "type_id": "经典老歌"
+    },
+    {
+      "type_name": "印度歌舞",
+      "type_id": "印度歌舞MV"
+    },
+    {
+      "type_name": "韩国女团",
+      "type_id": "韩国女团MV"
+    }
+  ],
+  "cookie": "SESSDATA=7624af93%2C1696008331%2C862c8%2A42; bili_jct=141a474ef3ce8cf2fedf384e68f6625d; DedeUserID=3493271303096985; DedeUserID__ckMd5=212a836c164605b7"
+}
