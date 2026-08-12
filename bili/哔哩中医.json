@@ -1,0 +1,56 @@
+{
+  "class": [
+    {
+      "type_name": "中医基础理论",
+      "type_id": "中医基础理论"
+    },
+    {
+      "type_name": "中医诊断学",
+      "type_id": "中医诊断学"
+    },
+    {
+      "type_name": "中药学",
+      "type_id": "中药学"
+    },
+    {
+      "type_name": "方剂学",
+      "type_id": "方剂学"
+    },
+    {
+      "type_name": "黄帝内经",
+      "type_id": "黄帝内经"
+    },
+    {
+      "type_name": "神农本草经",
+      "type_id": "神农本草经"
+    },
+    {
+      "type_name": "伤寒论",
+      "type_id": "伤寒论"
+    },
+    {
+      "type_name": "金匮要略",
+      "type_id": "金匮要略"
+    },
+    {
+      "type_name": "脉经",
+      "type_id": "脉经"
+    },
+    {
+      "type_name": "濒湖脉学",
+      "type_id": "濒湖脉学"
+    },
+    {
+      "type_name": "药性赋",
+      "type_id": "药性赋"
+    },
+    {
+      "type_name": "汤头歌诀",
+      "type_id": "汤头歌诀"
+    },
+    {
+      "type_name": "针灸甲乙经",
+      "type_id": "针灸甲乙经"
+    }
+  ]
+}

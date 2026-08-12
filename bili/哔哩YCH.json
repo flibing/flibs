@@ -1,0 +1,28 @@
+{
+  "class": [
+    {
+      "type_name": "热榜",
+      "type_id": "经典无损音乐热门歌曲"
+    },
+    {
+      "type_name": "舞曲",
+      "type_id": "经典无损音乐DJ歌曲"
+    },
+    {
+      "type_name": "古风",
+      "type_id": "经典无损音乐古风歌曲"
+    },
+    {
+      "type_name": "抖音神曲",
+      "type_id": "抖音神曲超清"
+    },
+    {
+      "type_name": "快手神曲",
+      "type_id": "快手神曲超清"
+    },
+    {
+      "type_name": "韩国女团",
+      "type_id": "韩国女团演唱会超清"
+    }
+  ]
+}
