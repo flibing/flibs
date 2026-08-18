@@ -19,7 +19,6 @@ class Spider(BaseSpider):
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "zh-CN,zh;q=0.9",
         }
-
         # 优先读取缓存，没有或过期则重新获取
         now = time.time()
         if self._cache_host and now - self._cache_time < self.CACHE_DURATION:
@@ -36,25 +35,25 @@ class Spider(BaseSpider):
             resp = requests.get(publish_url, headers=self.headers, timeout=15)
             resp.raise_for_status()
             html = resp.text
-
             # 正则提取JS中的domains数组
             pattern = r'const domains = (\[.*?\]);'
             match = re.search(pattern, html, re.S)
             if not match:
                 return "https://www.cd-zj.com"
-
             js_str = match.group(1)
             # 修复JS对象格式为标准JSON
             js_str = re.sub(r'(\w+)\s*:', r'"\1":', js_str)
             js_str = re.sub(r'"+', '"', js_str)
+            # 容错：去掉尾部多余逗号，防止json解析报错
+            js_str = re.sub(r',\s*]', ']', js_str)
             domains = json.loads(js_str)
-
             # 逐个检测连通性，返回第一个可用
             for item in domains:
-                url = item["url"]
+                url = item.get("url", "")
+                if not url:
+                    continue
                 if self.check_url_online(url):
                     return url.rstrip("/")
-
             return "https://www.cd-zj.com"
         except Exception as e:
             print(f"获取发布页异常: {e}")
@@ -65,23 +64,26 @@ class Spider(BaseSpider):
         try:
             r = requests.head(url, headers=self.headers, timeout=timeout, allow_redirects=True)
             return 200 <= r.status_code < 400
-        except:
+        except Exception:
             return False
 
     def getName(self):
         return '枫叶影院'
 
     def homeContent(self, filter):
-        return {"class": [
-            {'type_id': "/label/qq", 'type_name': "腾讯"},
-            {'type_id': "/label/bli", 'type_name': "B站"},
-            {'type_id': "/label/youku", 'type_name': "优酷"},
-            {"type_id": "2", "type_name": "电视剧"},
-            {"type_id": "1", "type_name": "电影"},
-            {"type_id": "4", "type_name": "动漫"},
-            {"type_id": "3", "type_name": "综艺"},
-            {"type_id": "5", "type_name": "热门短剧"},
-        ], "filters": self._build_filters()}
+        return {
+            "class": [
+                {'type_id': "/label/qq", 'type_name': "腾讯"},
+                {'type_id': "/label/bli", 'type_name': "B站"},
+                {'type_id': "/label/youku", 'type_name': "优酷"},
+                {"type_id": "2", "type_name": "电视剧"},
+                {"type_id": "1", "type_name": "电影"},
+                {"type_id": "4", "type_name": "动漫"},
+                {"type_id": "3", "type_name": "综艺"},
+                {"type_id": "5", "type_name": "热门短剧"},
+            ],
+            "filters": self._build_filters()
+        }
 
     def _build_filters(self):
         area = [{"n": "全部", "v": ""}, {"n": "大陆", "v": "大陆"}, {"n": "香港", "v": "香港"},
@@ -194,14 +196,23 @@ class Spider(BaseSpider):
         return {"list": self._parse_video_list(html)}
 
     def categoryContent(self, tid, pg, filter, extend):
-        # 构建筛选参数：参照歪比巴卜，直接取extend里的值，fallback到filter
+        # label标签分类 /label/qq /label/bli
         if tid.startswith('/label'):
             url = f'{tid}/page/{pg}.html'
             html = self._fetch(url)
             items = self._parse_video_list(html)
             page = int(pg)
-            page_count = page if len(items) < 24 else page + 2
-            return {"list": items, "page": page, "pagecount": page_count, "limit": 24, "total": page_count * 24}
+            soup = BeautifulSoup(html, 'html.parser')
+            pagecount = page
+            for a in soup.select('a.page-link'):
+                if a.text.strip() == '尾页':
+                    m = re.search(r'/page/(\d+)\.html', a.get('href', ''))
+                    if m:
+                        pagecount = int(m.group(1))
+                    break
+            if not items:
+                pagecount = page
+            return {"list": items, "page": page, "pagecount": pagecount, "limit": 24, "total": 9999}
 
         args = {}
         if extend and isinstance(extend, dict):
@@ -219,7 +230,8 @@ class Spider(BaseSpider):
         lang = args.get('lang', '')
         letter = args.get('letter', '')
         sort = args.get('sort', '')
-        # 无筛选走正常分页
+
+        # 无筛选条件
         if not area and not genre and not year and not lang and not letter and not sort:
             url = f'/cupfox-list/{route_tid}--------{pg}---.html'
             html = self._fetch(url)
@@ -228,7 +240,7 @@ class Spider(BaseSpider):
             soup = BeautifulSoup(html, 'html.parser')
             pagecount = page
             for a in soup.select('a.page-link'):
-                if a.text == '尾页':
+                if a.text.strip() == '尾页':
                     m = re.search(r'---(\d+)---', a.get('href', ''))
                     if m:
                         pagecount = int(m.group(1))
@@ -236,19 +248,30 @@ class Spider(BaseSpider):
             if not items:
                 pagecount = 0
             return {"list": items, "page": page, "pagecount": pagecount, "limit": 36, "total": 9999}
-        # 有筛选：{tid}-{area}-{sort}-{genre}-{lang}-{letter}------{year}.html
+
+        # 带筛选条件页面，修复：解析尾页获取真实总页数，不再写死1
         segs = [route_tid, area, sort, genre, lang, letter, '', '', year]
         url = '/cupfox-list/' + '-'.join(segs) + '.html'
         html = self._fetch(url)
         items = self._parse_video_list(html)
-        return {"list": items, "page": 1, "pagecount": 1, "limit": 36, "total": 9999}
+        page = int(pg)
+        soup = BeautifulSoup(html, 'html.parser')
+        pagecount = page
+        for a in soup.select('a.page-link'):
+            if a.text.strip() == '尾页':
+                m = re.search(r'---(\d+)---', a.get('href', ''))
+                if m:
+                    pagecount = int(m.group(1))
+                break
+        return {"list": items, "page": page, "pagecount": pagecount, "limit": 36, "total": 9999}
 
     def detailContent(self, ids):
         result = {"list": []}
         vid = ids[0].split(',')[0].strip()
         try:
             html = self._fetch(f'/detail/{vid}.html')
-            if not html: return result
+            if not html:
+                return result
             soup = BeautifulSoup(html, 'html.parser')
             vod_name = soup.select_one('h3.slide-info-title')
             vod_name = vod_name.text.strip() if vod_name else ''
@@ -266,7 +289,7 @@ class Spider(BaseSpider):
             vod_content = vod_content.get_text(' ', strip=True) if vod_content else ''
             play_from, play_url = [], []
             for tab in soup.select('.anthology-tab a.swiper-slide'):
-                src_name = re.sub(r'<[^>]+>', '', str(tab)).strip() or tab.get_text(' ', strip=True).strip()
+                src_name = tab.get_text(' ', strip=True).strip()
                 if src_name:
                     play_from.append(src_name)
             tab_blocks = soup.select('.anthology-list-box')
@@ -277,7 +300,8 @@ class Spider(BaseSpider):
                     m = re.search(r'/play/(.*?)\.html', href)
                     if m:
                         ep_list.append(f'{a.text.strip()}${vid}-{m.group(1)}')
-                ep_list.reverse()
+                # 不反转，根据实际网站自行切换
+                # ep_list.reverse()
                 if ep_list and i < len(play_from):
                     play_url.append('#'.join(ep_list))
             valid_from = [pf for i, pf in enumerate(play_from) if i < len(play_url)]
@@ -288,18 +312,27 @@ class Spider(BaseSpider):
                 "vod_play_from": "$$$".join(valid_from),
                 "vod_play_url": "$$$".join(play_url),
             })
-        except:
-            pass
+        except Exception as e:
+            print(f"detailContent error: {e}")
         return result
 
     def searchContent(self, key, quick, pg="1"):
         try:
             decoded = urllib.parse.unquote(key)
-        except:
+        except Exception:
             decoded = key
         html = self._fetch(f'/cupfox-search/{urllib.parse.quote(decoded)}----------{pg}---.html')
         items = self._parse_search_list(html)
-        return {"list": items, "page": int(pg), "pagecount": 1, "limit": 36, "total": len(items)}
+        page = int(pg)
+        soup = BeautifulSoup(html, 'html.parser')
+        pagecount = page
+        for a in soup.select('a.page-link'):
+            if a.text.strip() == '尾页':
+                m = re.search(r'---(\d+)---', a.get('href', ''))
+                if m:
+                    pagecount = int(m.group(1))
+                break
+        return {"list": items, "page": page, "pagecount": pagecount, "limit": 36, "total": 9999}
 
     def playerContent(self, flag, id, vipFlags):
         url = ''
@@ -309,60 +342,62 @@ class Spider(BaseSpider):
             if html:
                 m = re.search(r'player_aaaa=(.*?)</script>', html, re.S)
                 if m:
-
                     try:
                         pd = json.loads(m.group(1))
                     except Exception as e:
-                        print(e)
+                        print(f"parse player_aaaa json error {e}")
                         pd = {}
-                    # print('pd:', pd)
-                    play_url = pd.get('url')
-                    play_id = pd.get('from')
+                    play_url = pd.get('url', '')
+                    play_id = pd.get('from', '')
+                    # 如果已经是直链直接返回，不走第三方解析
+                    if play_url and (play_url.endswith('.m3u8') or play_url.endswith('.mp4')):
+                        return {
+                            "parse": 0,
+                            "url": play_url,
+                            "header": {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'}
+                        }
+                    # 没有拿到url，交给框架内置解析
+                    if not play_url:
+                        return {"parse": 1, "url": url}
 
+                    # 下面是第三方解析部分，第三方接口随时会失效，失效会自动降级为parse=1网页解析
                     api_map = {
                         'YYNB': 'https://zzrs.mfdyvip.com/player/mplayer.php',
                         'JD4K': 'https://fgsrg.hzqingshan.com/player/mplayer.php',
                     }
-                    if not play_url:
-                        return {"parse": 0, "url": 'https://php.doube.eu.org/error.m3u8',
-                                "header": {'User-Agent': 'Mozilla/5.0'}}
-                    if play_url.startswith('http') and (play_url.endswith('.m3u8') or play_url.endswith('.mp4')):
-                        return {"parse": 0, "url": play_url, "header": {'User-Agent': 'Mozilla/5.0'}}
+                    if play_id not in api_map:
+                        return {"parse": 1, "url": url}
 
-                    else:
-                        headers = {
-                            'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-                            'Accept': "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                            'accept-language': "zh-CN,zh;q=0.9",
-                            'cache-control': "no-cache",
-                            'pragma': "no-cache",
-                            'priority': "u=0, i",
-                            'referer': "https://www.ht10010.com/",
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        }
-                        response = requests.get(f"https://fgsrg.hzqingshan.com/player/?url={play_url}", headers=headers)
-                        token = re.search(r'data-te="(.*?)"', response.text)
-                        if token:
-                            token = token.group(1)
-                            payload = {
-                                'url': play_url,
-                                'token': token
-                            }
-                            # print('payload', payload)
-                            try:
-                                response = self.post(api_map[play_id], data=payload, headers=headers)
-
-                                response.raise_for_status()
-                                result = response.json()
-                                # print('result:', result)
-                                if result['code'] == 200 and 'url' in result:
-                                    play_url = result['url']
-                                    return {"parse": 0, "url": play_url, "header": {
-                                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'}}
-                            except Exception as e:
-                                print(e)
+                    headers = {
+                        'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+                        'Accept': "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                        'accept-language': "zh-CN,zh;q=0.9",
+                        'cache-control': "no-cache",
+                        'pragma': "no-cache",
+                        'referer': self.host
+                    }
+                    resp_token = requests.get(f"https://fgsrg.hzqingshan.com/player/?url={play_url}", headers=headers, timeout=10)
+                    token = re.search(r'data-te="(.*?)"', resp_token.text)
+                    if token:
+                        token = token.group(1)
+                        payload = {'url': play_url, 'token': token}
+                        try:
+                            resp_api = requests.post(api_map[play_id], data=payload, headers=headers, timeout=12)
+                            resp_api.raise_for_status()
+                            result = resp_api.json()
+                            if result.get('code') == 200 and 'url' in result:
+                                return {
+                                    "parse": 0,
+                                    "url": result['url'],
+                                    "header": {
+                                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
+                                    }
+                                }
+                        except Exception as e:
+                            print(f"third parse api fail {e}")
         except Exception as e:
-            print(e)
+            print(f"playerContent error: {e}")
+        # 第三方解析全部失败，启用网页解析模式
         return {"parse": 1, "url": url}
 
     def localProxy(self, param=''):
@@ -380,12 +415,14 @@ class Spider(BaseSpider):
                 url = self.host + url
             rsp = self.fetch(url, headers=self.headers)
             return rsp.text if rsp else ''
-        except:
+        except Exception:
             return ''
 
     def _fix_pic(self, u):
-        if not u: return ''
-        if u.startswith('//'): return 'https:' + u
+        if not u:
+            return ''
+        if u.startswith('//'):
+            return 'https:' + u
         return u.replace('&amp;', '&')
 
     def _parse_video_list(self, html):
@@ -395,19 +432,25 @@ class Spider(BaseSpider):
         for a in cards:
             href = a.get('href', '')
             m = re.search(r'/detail/(\d+)\.html', href)
-            if not m: continue
+            if not m:
+                continue
             vod_id = m.group(1)
-            if vod_id in seen: continue
+            if vod_id in seen:
+                continue
             seen.add(vod_id)
             span = ','.join([span.text for span in a.select('span.public-prt')])
-            # print('span', span)
             vod_name = a.get('title', '') or (a.select_one('img') and a.select_one('img').get('alt', '')) or ''
             pic_el = a.select_one('img')
             vod_pic = self._fix_pic(pic_el.get('data-src', '')) if pic_el else ''
             remark_el = a.select_one('.ft2') or a.select_one('.public-list-prb')
             vod_remarks = remark_el.text.strip() if remark_el else ''
-            videos.append(
-                {"vod_id": vod_id, "vod_name": vod_name.strip(), "vod_pic": vod_pic, "vod_remarks": vod_remarks, "vod_year": span})
+            videos.append({
+                "vod_id": vod_id,
+                "vod_name": vod_name.strip(),
+                "vod_pic": vod_pic,
+                "vod_remarks": vod_remarks,
+                "vod_year": span
+            })
         return videos
 
     def _parse_search_list(self, html):
@@ -417,9 +460,11 @@ class Spider(BaseSpider):
         for a in cards:
             href = a.get('href', '')
             m = re.search(r'/detail/(\d+)\.html', href)
-            if not m: continue
+            if not m:
+                continue
             vod_id = m.group(1)
-            if vod_id in seen: continue
+            if vod_id in seen:
+                continue
             seen.add(vod_id)
             pic_el = a.select_one('img')
             vod_pic = self._fix_pic(pic_el.get('data-src', '')) if pic_el else ''
@@ -430,16 +475,16 @@ class Spider(BaseSpider):
                 vod_name = a.select_one('img') and a.select_one('img').get('alt', '') or ''
             remark_el = a.select_one('.public-list-prb') or a.select_one('.ft2')
             vod_remarks = remark_el.text.strip() if remark_el else ''
-            videos.append(
-                {"vod_id": vod_id, "vod_name": vod_name.strip(), "vod_pic": vod_pic, "vod_remarks": vod_remarks})
+            videos.append({
+                "vod_id": vod_id,
+                "vod_name": vod_name.strip(),
+                "vod_pic": vod_pic,
+                "vod_remarks": vod_remarks
+            })
         return videos
 
 
 if __name__ == '__main__':
     sp = Spider()
     sp.init()
-    # 20067-5-189
-    print(sp.categoryContent('/label/qq','1',True, {}))
-    # print(sp.playerContent('', '20067-6-189', []))
-    # print(sp.playerContent('', '20067-5-189', []))
-    pass
+    print(sp.categoryContent('/label/qq', '1', True, {}))
